@@ -1,18 +1,27 @@
-<head>
-<link rel="authorization_endpoint" href="https://indieauth.com/auth">
-<link rel="token_endpoint" href="https://tokens.indieauth.com/token">
-<link rel="micropub" href="https://api.billywhizz.io/micropub">
-<!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=UA-1371855-5"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+---
+layout: default
+title: Blog
+---
 
-  gtag('config', 'UA-1371855-5');
-</script>
-</head>
-<body>
-    <a rel="me" href="https://github.com/billywhizz">Github</a>
-    <p>hello</p>
-</body>
+<div id="home">
+    <ul id="blog-posts" class="posts">
+        {% for post in paginator.posts %}
+            <li><div class="post_preheader"><span>{{ post.date | date: "%B %-d, %Y" }}</span></div>
+            <li><div class="post_header"><a href="{{ post.url }}"><b>{{ post.title }}</b></a></div></li>
+            <li>{{ post.excerpt }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="pagination">
+    {% if paginator.previous_page %}
+        <a href="{{ paginator.previous_page_path }}" class="previous">Previous</a>
+    {% endif %}
+
+    <span class="page_number">Page: {{ paginator.page }} of {{ paginator.total_pages }}</span>
+
+    {% if paginator.next_page %}
+        <a href="{{ paginator.next_page_path }}" class="next">Next</a>
+    {% endif %}
+</div>
+
