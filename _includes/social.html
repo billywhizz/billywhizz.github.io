@@ -11,6 +11,12 @@
   </a>
   {% endif %}
 
+  {% if site.data.theme.social.gitlab %}
+  <a title="Me on GitLab" href="https://gitlab.com/{{ site.data.theme.social.gitlab }}/">
+    <i class="fa fa-gitlab-square"></i>
+  </a>
+  {% endif %}
+
   {% if site.data.theme.social.hacker_news %}
   <a title="Me on Hacker News" href="https://news.ycombinator.com/user?id={{site.data.theme.social.hacker_news }}">
      <span class="fa-stack">

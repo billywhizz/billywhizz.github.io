@@ -4,28 +4,27 @@
 <!--[if IE 8 ]><html class="ie ie8" lang="en"> <![endif]-->
 <!--[if (gte IE 9)|!(IE)]><!--><html lang="en"> <!--<![endif]-->
     <head>
+        {% include analytics.html %}
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{{ site.data.theme.name }} - {{ page.title }}</title>
         <meta name="author" content="{{ site.data.theme.name }}" />
         <meta name="description" content="{{ site.title }} | {{ site.description }}" />
         <link rel="canonical" href="{{ site.url }}{{ page.url | replace:'index.html','' }}" />
-
         <link href="https://fonts.googleapis.com/css?family=Open+Sans:600,800" rel="stylesheet" type="text/css">
         <link rel="alternate" type="application/atom+xml" title="{{ site.data.theme.name }}" href="{{site.url}}/feed.xml" />
-
         <link rel="stylesheet" href="/assets/css/all.css">
         <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.min.css">
         <link rel="authorization_endpoint" href="https://indieauth.com/auth">
         <link rel="token_endpoint" href="https://tokens.indieauth.com/token">
         <link rel="micropub" href="https://api.billywhizz.io/micropub">
-        
+        <link rel="openid.delegate" href="https://billywhizz.io/" />
+        <link rel="openid.server" href="https://openid.indieauth.com/openid" />        
     </head>
     <body>
         <div class="header">
             <h1 class="site_title"><a href="/" class="site_title">{{ site.title }}</a></h1>
         </div>
-
         <div class="container">
             <div class="four columns sidebar">
                 {% include sidebar.html %}
@@ -35,9 +34,6 @@
                 {{ content }}
             </div>
         </div>
-
-        {% include analytics.html %}
-
         <div class="footer">
             {% include footer.html %}
         </div>
