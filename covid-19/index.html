@@ -1,0 +1,201 @@
+<head>
+  <link rel="stylesheet" href="uPlot.min.css"></link>
+  <script src="uPlot.iife.min.js"></script>
+  <style>
+    body {
+      background-color: #f0f0f0;
+    }
+  </style>
+</head>
+<script>
+  const config = {
+    deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv',
+    confirmed: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv',
+    recovered: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv'
+  }
+  const data = {}
+
+  function parse (line) {
+    let inField = false
+    const fields = []
+    let off = 0
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === ',') {
+        if (inField) continue
+        fields.push(line.slice(off, i))
+        off = i + 1
+        continue
+      }
+      if (line[i] === '"') {
+        if (inField) {
+          inField = false
+          continue
+        }
+        inField = true
+      }
+    }
+    fields.push(line.slice(off))
+    return fields
+  }
+
+  async function load (url) {
+    let res = await fetch(url)
+    let text = await res.text()
+    let lines = text.split('\n').map(line => line.trim()).filter(line => line)
+    const records = []
+    const headers = parse(lines.shift())
+    for (const line of lines) {
+      const record = {}
+      const fields = parse(line)
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i] === 'Lat' || headers[i] === 'Long') {
+          record[headers[i].toLowerCase()] = parseFloat(fields[i])
+          continue
+        }
+        if (headers[i].match(/\d{1,2}\/\d{1,2}\/\d{1,2}/)) {
+          record[headers[i]] = parseInt(fields[i], 10)
+          continue
+        }
+        if (headers[i] === 'Province/State') {
+          record.province = fields[i]
+          continue
+        }
+        if (headers[i] === 'Country/Region') {
+          record.region = fields[i]
+        }
+      }
+      records.push(record)
+    }
+    return records
+  }
+
+  function normalize (deaths, region) {
+    let data = deaths.filter(v => v.region === region)[0]
+    delete data.region
+    delete data.province
+    delete data.lat
+    delete data.long
+    return Object.keys(data).map(k => data[k]).filter(v => v)
+  }
+
+  async function onLoad () {
+    data.deaths = await load(config.deaths)
+    //data.confirmed = await load(config.confirmed)
+    //data.recovered = await load(config.recovered)
+    let deaths = data.deaths.filter(v => {
+      if (v.region === 'Italy') return true
+      if (v.region === 'Spain') return true
+      if (!v.province && v.region === 'Netherlands') return true
+      if (v.region === 'Germany') return true
+      if (v.province === 'Hubei' && v.region === 'China') return true
+      if (v.region === 'Iran') return true
+      if (!v.province && v.region === 'France') return true
+      if (v.region === 'US') return true
+      if (!v.province && v.region === 'United Kingdom') return true
+    })
+    const italy = normalize(deaths, 'Italy')
+    const spain = normalize(deaths, 'Spain')
+    const germany = normalize(deaths, 'Germany')
+    const netherlands = normalize(deaths, 'Netherlands')
+    const china = normalize(deaths, 'China')
+    const iran = normalize(deaths, 'Iran')
+    const france = normalize(deaths, 'France')
+    const uk = normalize(deaths, 'United Kingdom')
+    const us = normalize(deaths, 'US')
+    const max = Math.max(italy.length, spain.length, uk.length, china.length, iran.length, france.length, us.length, germany.length, netherlands.length)
+    const maxY = Math.max(...[Math.max(...italy), Math.max(...spain), Math.max(...uk), Math.max(...china), Math.max(...iran), Math.max(...france), Math.max(...us), Math.max(...germany), Math.max(...netherlands)])
+    const chartData = [[], italy, spain, uk, china, iran, france, us, netherlands, germany]
+    for (let i = 0; i < max; i++) {
+      chartData[0].push(i)
+    }
+    let opts = {
+      title: 'COVID-19 Cumulative Deaths By Region - From date of first death',
+      id: 'chart1',
+      class: 'my-chart',
+      width: 1600,
+      height: 800,
+      scales: {
+        'x': {
+          time: false
+        },
+        'y': {
+          range: [0, maxY]
+        }
+      },
+      axes: [
+        {
+          space: 10,
+          label: 'Day',
+          incrs: chartData[0],
+          values: (self, ticks, space) => ticks
+        },
+        {
+          scale: 'Deaths',
+          space: 20,
+          label: 'Deaths'
+        }
+      ],
+      series: [
+        {},
+        {
+          show: true,
+          label: "Italy",
+          stroke: "green",
+          width: 2
+        },
+        {
+          show: true,
+          label: "Spain",
+          stroke: "red",
+          width: 2
+        },
+        {
+          show: true,
+          label: "UK",
+          stroke: "blue",
+          width: 2
+        },
+        {
+          show: true,
+          label: "China (Hubei)",
+          stroke: "magenta",
+          width: 2
+        },
+        {
+          show: true,
+          label: "Iran",
+          stroke: "yellow",
+          width: 2
+        },
+        {
+          show: true,
+          label: "France",
+          stroke: "darkgray",
+          width: 2
+        },
+        {
+          show: true,
+          label: "USA",
+          stroke: "darkblue",
+          width: 2
+        },
+        {
+          show: true,
+          label: "Netherlands",
+          stroke: "orange",
+          width: 2
+        },
+        {
+          show: true,
+          label: "Germany",
+          stroke: "black",
+          width: 2
+        }
+      ]
+    }
+    let uplot = new uPlot(opts, chartData, document.body);    
+  }
+</script>
+<body onload="onLoad()" onresize="resize()">
+
+</body>
