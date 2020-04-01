@@ -4,18 +4,46 @@
   <style>
     body {
       background-color: #f0f0f0;
+      font-family: monospace;
+    }
+    div#chart {
+      position: absolute;
+      top: 10px;
+      bottom: 10px;
+      left: 10px;
+      right: 340px;
+      background-color: white;
+    }
+    div#start {
+      position: absolute;
+      top: 10px;
+      bottom: 10px;
+      right: 10px;
+      width: 320px;
+      background-color: white;
+    }
+    table.legend th,td {
+      font-family: monospace;
+      font-size: 8pt;
+    }
+    .uplot .legend th {
+      font-weight: normal;
+    }
+    table.legend tr {
+      margin: 0px;
+    }
+    table#tblStart td.right {
+      text-align: right;
     }
   </style>
 </head>
 <script>
   const config = {
-    deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv',
-    confirmed: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv',
-    recovered: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv'
+    deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv'
   }
   const data = {}
 
-  function parse (line) {
+  function parseLine (line) {
     let inField = false
     const fields = []
     let off = 0
@@ -43,25 +71,21 @@
     let text = await res.text()
     let lines = text.split('\n').map(line => line.trim()).filter(line => line)
     const records = []
-    const headers = parse(lines.shift())
+    const headers = parseLine(lines.shift())
     for (const line of lines) {
       const record = {}
-      const fields = parse(line)
+      const fields = parseLine(line)
       for (let i = 0; i < headers.length; i++) {
-        if (headers[i] === 'Lat' || headers[i] === 'Long') {
-          record[headers[i].toLowerCase()] = parseFloat(fields[i])
-          continue
-        }
         if (headers[i].match(/\d{1,2}\/\d{1,2}\/\d{1,2}/)) {
           record[headers[i]] = parseInt(fields[i], 10)
           continue
         }
         if (headers[i] === 'Province/State') {
-          record.province = fields[i]
+          record.province = fields[i].replace(/"/g, '')
           continue
         }
         if (headers[i] === 'Country/Region') {
-          record.region = fields[i]
+          record.region = fields[i].replace(/"/g, '')
         }
       }
       records.push(record)
@@ -69,51 +93,53 @@
     return records
   }
 
-  function normalize (deaths, region) {
-    let data = deaths.filter(v => v.region === region)[0]
+  function normalize (data, index) {
+    const { region } = data
     delete data.region
     delete data.province
-    delete data.lat
-    delete data.long
-    return Object.keys(data).map(k => data[k]).filter(v => v)
+    const keys = Object.keys(data)
+    const result = keys.map(k => {
+      return { value: data[k], date: k }
+    }).filter(v => v.value)
+    if (!result.length) return { region, max: 0, start: '', data: []}
+    const max = Math.max(...result.map(v => v.value))
+    return { region, max, start: new Date(result[0].date), data: result.map(v => v.value) }
   }
+
+  function getSeries (name, color) {
+    return {
+      label: name,
+      stroke: color,
+      width: 2
+    }
+  }
+
+  let colors = ['green', 'blue', 'red', 'yellow', 'orange', 'magenta', 'purple', 'darkgray', 'navy', 'lime', 'darkred', 'olive', 'teal', 'deepskyblue', 'indigo']
 
   async function onLoad () {
     data.deaths = await load(config.deaths)
-    //data.confirmed = await load(config.confirmed)
-    //data.recovered = await load(config.recovered)
-    let deaths = data.deaths.filter(v => {
-      if (v.region === 'Italy') return true
-      if (v.region === 'Spain') return true
-      if (!v.province && v.region === 'Netherlands') return true
-      if (v.region === 'Germany') return true
-      if (v.province === 'Hubei' && v.region === 'China') return true
-      if (v.region === 'Iran') return true
-      if (!v.province && v.region === 'France') return true
-      if (v.region === 'US') return true
-      if (!v.province && v.region === 'United Kingdom') return true
+    let deaths = data.deaths.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    deaths.sort((a, b) => {
+      const aMax = Math.max(...a.data)
+      const bMax = Math.max(...b.data)
+      if (aMax > bMax) return -1
+      if (aMax < bMax) return 1
+      return 0
     })
-    const italy = normalize(deaths, 'Italy')
-    const spain = normalize(deaths, 'Spain')
-    const germany = normalize(deaths, 'Germany')
-    const netherlands = normalize(deaths, 'Netherlands')
-    const china = normalize(deaths, 'China')
-    const iran = normalize(deaths, 'Iran')
-    const france = normalize(deaths, 'France')
-    const uk = normalize(deaths, 'United Kingdom')
-    const us = normalize(deaths, 'US')
-    const max = Math.max(italy.length, spain.length, uk.length, china.length, iran.length, france.length, us.length, germany.length, netherlands.length)
-    const maxY = Math.max(...[Math.max(...italy), Math.max(...spain), Math.max(...uk), Math.max(...china), Math.max(...iran), Math.max(...france), Math.max(...us), Math.max(...germany), Math.max(...netherlands)])
-    const chartData = [[], italy, spain, uk, china, iran, france, us, netherlands, germany]
+    deaths = deaths.slice(0, colors.length)
+    const max = Math.max(...deaths.map(v => v.data.length))
+    const points = []
     for (let i = 0; i < max; i++) {
-      chartData[0].push(i)
+      points.push(i)
     }
+    const maxY = Math.max(...deaths.map(v => Math.log10(v.max)))
+    const chartData = [points, ...deaths.map(v => v.data.map(v1 => Math.log10(v1)))]
     let opts = {
-      title: 'COVID-19 Cumulative Deaths By Region - From date of first death',
-      id: 'chart1',
-      class: 'my-chart',
-      width: 1600,
-      height: 800,
+      title: '',
+      left: 10,
+      width: chart.clientWidth,
+      height: chart.clientHeight,
+      legend: { show: false },
       scales: {
         'x': {
           time: false
@@ -125,77 +151,60 @@
       axes: [
         {
           space: 10,
-          label: 'Day',
+          font: '8pt monospace',
           incrs: chartData[0],
           values: (self, ticks, space) => ticks
         },
         {
           scale: 'Deaths',
-          space: 20,
-          label: 'Deaths'
+          font: '8pt monospace',
+          space: 20
         }
       ],
       series: [
-        {},
-        {
-          show: true,
-          label: "Italy",
-          stroke: "green",
-          width: 2
-        },
-        {
-          show: true,
-          label: "Spain",
-          stroke: "red",
-          width: 2
-        },
-        {
-          show: true,
-          label: "UK",
-          stroke: "blue",
-          width: 2
-        },
-        {
-          show: true,
-          label: "China (Hubei)",
-          stroke: "magenta",
-          width: 2
-        },
-        {
-          show: true,
-          label: "Iran",
-          stroke: "yellow",
-          width: 2
-        },
-        {
-          show: true,
-          label: "France",
-          stroke: "darkgray",
-          width: 2
-        },
-        {
-          show: true,
-          label: "USA",
-          stroke: "darkblue",
-          width: 2
-        },
-        {
-          show: true,
-          label: "Netherlands",
-          stroke: "orange",
-          width: 2
-        },
-        {
-          show: true,
-          label: "Germany",
-          stroke: "black",
-          width: 2
-        }
+        {}
       ]
     }
-    let uplot = new uPlot(opts, chartData, document.body);    
+    for (let i = 0; i < deaths.length; i++) {
+      const data = deaths[i]
+      opts.series.push(getSeries(data.region, colors[i % colors.length]))
+      drawSpark(data, colors[i % colors.length])
+    }
+    let uplot = new uPlot(opts, chartData, chart)
+  }
+
+  function drawSpark (stat, color) {
+    const { region, start, data, max } = stat
+    const table = document.getElementById('tblStart')
+    const row = table.insertRow(-1)
+    let cell = row.insertCell(0)
+    cell.style.backgroundColor = color
+    cell.style.width = '14px'
+    cell = row.insertCell(1)
+    cell.innerText = region
+    cell = row.insertCell(2)
+    cell.className = 'right'
+    cell.innerText = `${start.getDate()}/${start.getMonth() + 1}`
+    const hide = { show: false }
+    const opts = { width: 150, height: 20, cursor: hide, select: hide, legend: hide, scales: { x: { time: false } }, axes: [ hide, hide ], series: [ {}, { stroke: '#03a9f4', fill: '#b3e5fc' }] }
+    const d = [[], []]
+    for (let i = 0; i < data.length; i++) {
+      d[0][i] = i
+      if (i > 0) {
+        d[1][i] = data[i] - data[i - 1]
+        continue
+      }
+      d[1][i] = data[i]
+    }
+    cell = row.insertCell(3)
+    cell.className = 'right'
+    cell.innerText = max
+    let u = new uPlot(opts, d)
+    cell = row.insertCell(4)
+    cell.appendChild(u.root.querySelector("canvas"))
   }
 </script>
-<body onload="onLoad()" onresize="resize()">
-
+<body onload="onLoad()">
+  <div id="chart"></div>
+  <div id="start"><table id="tblStart" cellpadding="0" cellspacing="1"></table></div>
 </body>
