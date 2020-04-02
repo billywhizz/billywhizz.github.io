@@ -6,9 +6,17 @@
       background-color: #f0f0f0;
       font-family: monospace;
     }
-    div#chart {
+    div#control {
       position: absolute;
       top: 10px;
+      height: 60px;
+      left: 10px;
+      right: 10px;
+      background-color: #c0c0c0;
+    }
+    div#chart {
+      position: absolute;
+      top: 80px;
       bottom: 10px;
       left: 10px;
       right: 340px;
@@ -16,7 +24,7 @@
     }
     div#start {
       position: absolute;
-      top: 10px;
+      top: 80px;
       bottom: 10px;
       right: 10px;
       width: 320px;
@@ -39,9 +47,74 @@
 </head>
 <script>
   const config = {
-    deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv'
+    deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv',
+    logarithmic: false
   }
+  let colors = ['green', 'blue', 'red', 'yellow', 'orange', 'magenta', 'purple', 'darkgray', 'navy', 'lime', 'darkred', 'olive', 'teal', 'deepskyblue', 'indigo']
   const data = {}
+
+  function drawGraph (logarithmic = chkLog.checked, show = 10) {
+    chart.innerHTML = ''
+    if (txtShow.value) {
+      show = parseInt(txtShow.value, 10)
+    }
+    const deaths = data.deaths.slice(0, show)
+    const max = Math.max(...deaths.map(v => v.data.length))
+    const points = []
+    for (let i = 0; i < max; i++) {
+      points.push(i)
+    }
+    let maxY
+    let chartData
+    if (logarithmic) {
+      maxY = Math.max(...deaths.map(v => Math.log10(v.max)))
+      chartData = [points, ...deaths.map(v => v.data.map(v1 => Math.log10(v1)))]
+    } else {
+      maxY = Math.max(...deaths.map(v => v.max))
+      chartData = [points, ...deaths.map(v => v.data.map(v1 => v1))]
+    }
+    let opts = {
+      title: '',
+      left: 10,
+      width: chart.clientWidth,
+      height: chart.clientHeight,
+      legend: { show: false },
+      scales: {
+        'x': {
+          time: false
+        },
+        'y': {
+          range: [0, maxY]
+        }
+      },
+      axes: [
+        {
+          space: 10,
+          font: '8pt monospace',
+          incrs: chartData[0],
+          values: (self, ticks, space) => ticks
+        },
+        {
+          scale: 'Deaths',
+          font: '8pt monospace',
+          space: 20
+        }
+      ],
+      series: [
+        {}
+      ]
+    }
+    const tbody = document.createElement('tbody')
+    const old = document.getElementById('tblStart')
+    old.parentNode.replaceChild(tbody, old)
+    tbody.id = 'tblStart'
+    for (let i = 0; i < deaths.length; i++) {
+      const data = deaths[i]
+      opts.series.push(getSeries(data.region, colors[i % colors.length]))
+      drawSpark(tbody, data, colors[i % colors.length])
+    }
+    let uplot = new uPlot(opts, chartData, chart)
+  }
 
   function parseLine (line) {
     let inField = false
@@ -114,69 +187,9 @@
     }
   }
 
-  let colors = ['green', 'blue', 'red', 'yellow', 'orange', 'magenta', 'purple', 'darkgray', 'navy', 'lime', 'darkred', 'olive', 'teal', 'deepskyblue', 'indigo']
-
-  async function onLoad () {
-    data.deaths = await load(config.deaths)
-    let deaths = data.deaths.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
-    deaths.sort((a, b) => {
-      const aMax = Math.max(...a.data)
-      const bMax = Math.max(...b.data)
-      if (aMax > bMax) return -1
-      if (aMax < bMax) return 1
-      return 0
-    })
-    deaths = deaths.slice(0, colors.length)
-    const max = Math.max(...deaths.map(v => v.data.length))
-    const points = []
-    for (let i = 0; i < max; i++) {
-      points.push(i)
-    }
-    const maxY = Math.max(...deaths.map(v => Math.log10(v.max)))
-    const chartData = [points, ...deaths.map(v => v.data.map(v1 => Math.log10(v1)))]
-    let opts = {
-      title: '',
-      left: 10,
-      width: chart.clientWidth,
-      height: chart.clientHeight,
-      legend: { show: false },
-      scales: {
-        'x': {
-          time: false
-        },
-        'y': {
-          range: [0, maxY]
-        }
-      },
-      axes: [
-        {
-          space: 10,
-          font: '8pt monospace',
-          incrs: chartData[0],
-          values: (self, ticks, space) => ticks
-        },
-        {
-          scale: 'Deaths',
-          font: '8pt monospace',
-          space: 20
-        }
-      ],
-      series: [
-        {}
-      ]
-    }
-    for (let i = 0; i < deaths.length; i++) {
-      const data = deaths[i]
-      opts.series.push(getSeries(data.region, colors[i % colors.length]))
-      drawSpark(data, colors[i % colors.length])
-    }
-    let uplot = new uPlot(opts, chartData, chart)
-  }
-
-  function drawSpark (stat, color) {
+  function drawSpark (tbody, stat, color) {
     const { region, start, data, max } = stat
-    const table = document.getElementById('tblStart')
-    const row = table.insertRow(-1)
+    const row = tbody.insertRow(-1)
     let cell = row.insertCell(0)
     cell.style.backgroundColor = color
     cell.style.width = '14px'
@@ -203,8 +216,27 @@
     cell = row.insertCell(4)
     cell.appendChild(u.root.querySelector("canvas"))
   }
+
+  async function onLoad () {
+    const deaths = await load(config.deaths)
+    data.deaths = deaths.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    data.deaths.sort((a, b) => {
+      const aMax = Math.max(...a.data)
+      const bMax = Math.max(...b.data)
+      if (aMax > bMax) return -1
+      if (aMax < bMax) return 1
+      return 0
+    })
+    drawGraph()
+  }
+
 </script>
 <body onload="onLoad()">
+  <div id="control">
+    <input type="checkbox" id="chkLog" onclick="drawGraph()">log scale</input>
+    <label for="txtShow">Show</label>
+    <input type="text" size="3" id="txtShow" value="10"/>
+  </div>
   <div id="chart"></div>
-  <div id="start"><table id="tblStart" cellpadding="0" cellspacing="1"></table></div>
+  <div id="start"><table cellpadding="0" cellspacing="1"><tbody id="tblStart"></tbody></table></div>
 </body>
