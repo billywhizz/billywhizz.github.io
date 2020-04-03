@@ -53,12 +53,15 @@
   let colors = ['green', 'blue', 'red', 'yellow', 'orange', 'magenta', 'purple', 'darkgray', 'navy', 'lime', 'darkred', 'olive', 'teal', 'deepskyblue', 'indigo']
   const data = {}
 
-  function drawGraph (logarithmic = chkLog.checked, show = 10) {
+  function drawGraph (logarithmic = chkLog.checked, show = 10, region) {
     chart.innerHTML = ''
     if (txtShow.value) {
       show = parseInt(txtShow.value, 10)
     }
-    const deaths = data.deaths.slice(0, show)
+    let deaths = data.deaths.slice(0, show)
+    if (region) {
+      deaths = data.deaths.filter(v => v.region === region)
+    }
     const max = Math.max(...deaths.map(v => v.data.length))
     const points = []
     for (let i = 0; i < max; i++) {
@@ -112,6 +115,20 @@
       const data = deaths[i]
       opts.series.push(getSeries(data.region, colors[i % colors.length]))
       drawSpark(tbody, data, colors[i % colors.length])
+    }
+    if (region) {
+      opts.series.push(getSeries('Exponential', colors[1]))
+      const exp = []
+      const interval = 3
+      for (let i = 0; i < max; i++) {
+        const val = Math.pow(2, (Math.floor(i / interval)) + ((i % interval) * (1 / interval)))
+        if (logarithmic) {
+          exp.push(Math.log10(val))
+        } else {
+          exp.push(val)
+        }
+      }
+      chartData.push(exp)
     }
     let uplot = new uPlot(opts, chartData, chart)
   }
@@ -217,6 +234,15 @@
     cell.appendChild(u.root.querySelector("canvas"))
   }
 
+  function loadDropdown() {
+    const regions = data.deaths.map(v => v.region)
+    for (const region of regions) {
+      const opt = document.createElement('option')
+      opt.text = opt.value = region
+      selRegion.add(opt)
+    }
+  }
+
   async function onLoad () {
     const deaths = await load(config.deaths)
     data.deaths = deaths.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
@@ -227,15 +253,21 @@
       if (aMax < bMax) return 1
       return 0
     })
+    loadDropdown()
     drawGraph()
   }
 
+  function selectRegion () {
+    const region = selRegion.value
+    drawGraph(chkLog.checked, 1, region)
+  }
 </script>
 <body onload="onLoad()">
   <div id="control">
     <input type="checkbox" id="chkLog" onclick="drawGraph()">log scale</input>
     <label for="txtShow">Show</label>
     <input type="text" size="3" id="txtShow" value="10"/>
+    <select id="selRegion" onchange="selectRegion()"></select>
   </div>
   <div id="chart"></div>
   <div id="start"><table cellpadding="0" cellspacing="1"><tbody id="tblStart"></tbody></table></div>
