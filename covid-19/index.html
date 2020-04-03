@@ -190,7 +190,7 @@
     const keys = Object.keys(data)
     const result = keys.map(k => {
       return { value: data[k], date: k }
-    }).filter(v => v.value)
+    }).filter(v => v.value > 10)
     if (!result.length) return { region, max: 0, start: '', data: []}
     const max = Math.max(...result.map(v => v.value))
     return { region, max, start: new Date(result[0].date), data: result.map(v => v.value) }
