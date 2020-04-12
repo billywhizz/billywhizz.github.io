@@ -58,6 +58,7 @@
     if (txtShow.value) {
       show = parseInt(txtShow.value, 10)
     }
+    const start = 0
     let deaths = data.deaths.slice(0, show)
     if (region) {
       deaths = data.deaths.filter(v => v.region === region)
@@ -116,8 +117,8 @@
       opts.series.push(getSeries(data.region, colors[i % colors.length]))
       drawSpark(tbody, data, colors[i % colors.length])
     }
-    if (region) {
-      opts.series.push(getSeries('Exponential', colors[1]))
+    //if (region) {
+      opts.series.push(getSeries('Exponential', 'lightgray'))
       const exp = []
       const interval = 3
       for (let i = 0; i < max; i++) {
@@ -129,7 +130,7 @@
         }
       }
       chartData.push(exp)
-    }
+    //}
     let uplot = new uPlot(opts, chartData, chart)
   }
 
@@ -190,10 +191,10 @@
     const keys = Object.keys(data)
     const result = keys.map(k => {
       return { value: data[k], date: k }
-    }).filter(v => v.value > 10)
+    }).filter(v => v.value >= 5)
     if (!result.length) return { region, max: 0, start: '', data: []}
-    const max = Math.max(...result.map(v => v.value))
-    return { region, max, start: new Date(result[0].date), data: result.map(v => v.value) }
+    const max = Math.max(...result.map(v => v.value - 5))
+    return { region, max, start: new Date(result[0].date), data: result.map(v => v.value - 5) }
   }
 
   function getSeries (name, color) {
