@@ -1,27 +1,45 @@
----
-layout: default
-title: Blog
----
-
-<div id="home">
-    <ul id="blog-posts" class="posts">
-        {% for post in paginator.posts %}
-            <li><div class="post_preheader"><span>{{ post.date | date: "%B %-d, %Y" }}</span></div>
-            <li><div class="post_header"><a href="{{ post.url }}"><b>{{ post.title }}</b></a></div></li>
-            <li>{{ post.excerpt }}</li>
-        {% endfor %}
-    </ul>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>just.js</title>
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-1371855-5"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'UA-1371855-5');
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="description" content="Andrew Johnston's Home Page" />
+<link rel="stylesheet" href="/index.css" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Andrew Johnston's Home Page">
+<meta name="application-name" content="Andrew Johnston's Home Page">
+<meta name="msapplication-TileColor" content="#da532c">
+<meta name="theme-color" content="#ffffff">
+</head>
+<body>
+<main>
+<div class="logo">
+<img src="apple-icon.png" />
 </div>
-
-<div class="pagination">
-    {% if paginator.previous_page %}
-        <a href="{{ paginator.previous_page_path }}" class="previous">Previous</a>
-    {% endif %}
-
-    <span class="page_number">Page: {{ paginator.page }} of {{ paginator.total_pages }}</span>
-
-    {% if paginator.next_page %}
-        <a href="{{ paginator.next_page_path }}" class="next">Next</a>
-    {% endif %}
+<div class="main">
+<h2>Andrew Johnston</h2>
+<p>
+<a rel="noopener" href="https://github.com/billywhizz">github</a> | 
+<a rel="noopener" href="https://gitlab.com/billywhizz">gitlab</a> | 
+<a rel="noopener" href="https://twitter.com/billywhizz1970">twitter</a>
+</p>
+<h2>Just(js) Project</h2>
+<p>
+<a href="https://just.billywhizz.io/blog">just(js) blog</a></li> | 
+<a rel="noopener" href="https://github.com/just-js">just(js) github</a>
+</p>
 </div>
-
+</main>
+</body>
+</html>
