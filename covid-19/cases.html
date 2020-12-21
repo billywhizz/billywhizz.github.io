@@ -3,7 +3,6 @@
   <script src="uPlot.iife.min.js"></script>
   <style>
     body {
-      background-color: #f0f0f0;
       font-family: monospace;
     }
     div#control {
@@ -12,14 +11,13 @@
       height: 60px;
       left: 10px;
       right: 10px;
-      background-color: #c0c0c0;
     }
     div#chart {
       position: absolute;
       top: 80px;
       bottom: 10px;
       left: 10px;
-      right: 340px;
+      right: 380px;
       background-color: white;
     }
     div#start {
@@ -27,7 +25,7 @@
       top: 80px;
       bottom: 10px;
       right: 10px;
-      width: 320px;
+      width: 360px;
       background-color: white;
     }
     table.legend th,td {
@@ -47,7 +45,7 @@
 </head>
 <script>
   const config = {
-    deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv',
+    cases: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv',
     logarithmic: false
   }
   let colors = ['green', 'blue', 'red', 'yellow', 'orange', 'magenta', 'purple', 'darkgray', 'navy', 'lime', 'darkred', 'olive', 'teal', 'deepskyblue', 'indigo']
@@ -59,11 +57,11 @@
       show = parseInt(txtShow.value, 10)
     }
     const start = 0
-    let deaths = data.deaths.slice(0, show)
+    let cases = data.cases.slice(0, show)
     if (region) {
-      deaths = data.deaths.filter(v => v.region === region)
+      cases = data.cases.filter(v => v.region === region)
     }
-    const max = Math.max(...deaths.map(v => v.data.length))
+    const max = Math.max(...cases.map(v => v.data.length))
     const points = []
     for (let i = 0; i < max; i++) {
       points.push(i)
@@ -71,11 +69,11 @@
     let maxY
     let chartData
     if (logarithmic) {
-      maxY = Math.max(...deaths.map(v => Math.log10(v.max)))
-      chartData = [points, ...deaths.map(v => v.data.map(v1 => Math.log10(v1)))]
+      maxY = Math.max(...cases.map(v => Math.log10(v.max)))
+      chartData = [points, ...cases.map(v => v.data.map(v1 => Math.log10(v1)))]
     } else {
-      maxY = Math.max(...deaths.map(v => v.max))
-      chartData = [points, ...deaths.map(v => v.data.map(v1 => v1))]
+      maxY = Math.max(...cases.map(v => v.max))
+      chartData = [points, ...cases.map(v => v.data.map(v1 => v1))]
     }
     let opts = {
       title: '',
@@ -99,9 +97,10 @@
           values: (self, ticks, space) => ticks
         },
         {
-          scale: 'Deaths',
+          scale: 'Cases',
           font: '8pt monospace',
-          space: 20
+          space: 20,
+          size: 90
         }
       ],
       series: [
@@ -112,25 +111,23 @@
     const old = document.getElementById('tblStart')
     old.parentNode.replaceChild(tbody, old)
     tbody.id = 'tblStart'
-    for (let i = 0; i < deaths.length; i++) {
-      const data = deaths[i]
+    for (let i = 0; i < cases.length; i++) {
+      const data = cases[i]
       opts.series.push(getSeries(data.region, colors[i % colors.length]))
       drawSpark(tbody, data, colors[i % colors.length])
     }
-    //if (region) {
-      opts.series.push(getSeries('Exponential', 'lightgray'))
-      const exp = []
-      const interval = 3
-      for (let i = 0; i < max; i++) {
-        const val = Math.pow(2, (Math.floor(i / interval)) + ((i % interval) * (1 / interval)))
-        if (logarithmic) {
-          exp.push(Math.log10(val))
-        } else {
-          exp.push(val)
-        }
+    opts.series.push(getSeries('Exponential', 'lightgray'))
+    const exp = []
+    const interval = 3
+    for (let i = 0; i < max; i++) {
+      const val = Math.pow(2, (Math.floor(i / interval)) + ((i % interval) * (1 / interval)))
+      if (logarithmic) {
+        exp.push(Math.log10(val))
+      } else {
+        exp.push(val)
       }
-      chartData.push(exp)
-    //}
+    }
+    chartData.push(exp)
     let uplot = new uPlot(opts, chartData, chart)
   }
 
@@ -210,7 +207,9 @@
     const row = tbody.insertRow(-1)
     let cell = row.insertCell(0)
     cell.style.backgroundColor = color
+    cell.innerText = '00'
     cell.style.width = '14px'
+    cell.style.color = color
     cell = row.insertCell(1)
     cell.innerText = region
     cell = row.insertCell(2)
@@ -236,7 +235,7 @@
   }
 
   function loadDropdown() {
-    const regions = data.deaths.map(v => v.region)
+    const regions = data.cases.map(v => v.region)
     for (const region of regions) {
       const opt = document.createElement('option')
       opt.text = opt.value = region
@@ -245,9 +244,9 @@
   }
 
   async function onLoad () {
-    const deaths = await load(config.deaths)
-    data.deaths = deaths.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
-    data.deaths.sort((a, b) => {
+    const cases = await load(config.cases)
+    data.cases = cases.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    data.cases.sort((a, b) => {
       const aMax = Math.max(...a.data)
       const bMax = Math.max(...b.data)
       if (aMax > bMax) return -1
@@ -267,7 +266,7 @@
   <div id="control">
     <input type="checkbox" id="chkLog" onclick="drawGraph()">log scale</input>
     <label for="txtShow">Show</label>
-    <input type="text" size="3" id="txtShow" value="40"/>
+    <input type="text" size="3" id="txtShow" value="200"/>
     <select id="selRegion" onchange="selectRegion()"></select>
   </div>
   <div id="chart"></div>

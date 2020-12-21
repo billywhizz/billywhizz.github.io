@@ -3,7 +3,6 @@
   <script src="uPlot.iife.min.js"></script>
   <style>
     body {
-      background-color: #f0f0f0;
       font-family: monospace;
     }
     div#control {
@@ -12,14 +11,13 @@
       height: 60px;
       left: 10px;
       right: 10px;
-      background-color: #c0c0c0;
     }
     div#chart {
       position: absolute;
       top: 80px;
       bottom: 10px;
       left: 10px;
-      right: 340px;
+      right: 380px;
       background-color: white;
     }
     div#start {
@@ -27,7 +25,7 @@
       top: 80px;
       bottom: 10px;
       right: 10px;
-      width: 320px;
+      width: 360px;
       background-color: white;
     }
     table.legend th,td {
@@ -96,12 +94,15 @@
           space: 10,
           font: '8pt monospace',
           incrs: chartData[0],
-          values: (self, ticks, space) => ticks
+          values: (self, ticks, space) => ticks,
+          show: true
         },
         {
           scale: 'Deaths',
           font: '8pt monospace',
-          space: 20
+          space: 20,
+          size: 80,
+          show: true
         }
       ],
       series: [
@@ -117,20 +118,18 @@
       opts.series.push(getSeries(data.region, colors[i % colors.length]))
       drawSpark(tbody, data, colors[i % colors.length])
     }
-    //if (region) {
-      opts.series.push(getSeries('Exponential', 'lightgray'))
-      const exp = []
-      const interval = 3
-      for (let i = 0; i < max; i++) {
-        const val = Math.pow(2, (Math.floor(i / interval)) + ((i % interval) * (1 / interval)))
-        if (logarithmic) {
-          exp.push(Math.log10(val))
-        } else {
-          exp.push(val)
-        }
+    opts.series.push(getSeries('Exponential', 'lightgray'))
+    const exp = []
+    const interval = 3
+    for (let i = 0; i < max; i++) {
+      const val = Math.pow(2, (Math.floor(i / interval)) + ((i % interval) * (1 / interval)))
+      if (logarithmic) {
+        exp.push(Math.log10(val))
+      } else {
+        exp.push(val)
       }
-      chartData.push(exp)
-    //}
+    }
+    chartData.push(exp)
     let uplot = new uPlot(opts, chartData, chart)
   }
 
@@ -201,7 +200,8 @@
     return {
       label: name,
       stroke: color,
-      width: 2
+      width: 2,
+      value: (self, rawValue) => rawValue / 1000000
     }
   }
 
@@ -210,7 +210,9 @@
     const row = tbody.insertRow(-1)
     let cell = row.insertCell(0)
     cell.style.backgroundColor = color
+    cell.innerText = '00'
     cell.style.width = '14px'
+    cell.style.color = color
     cell = row.insertCell(1)
     cell.innerText = region
     cell = row.insertCell(2)
