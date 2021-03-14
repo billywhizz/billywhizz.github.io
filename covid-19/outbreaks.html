@@ -170,7 +170,7 @@
       },
       y: {
         time: false,
-        range: [-300,300]
+        range: [-600,600]
       }
     }
     const opts = {
@@ -328,7 +328,8 @@
         cases[i].rate = (ma14[ma14.length - 1] - ma14[ma14.length - 15]) / ma14[ma14.length - 15]
       }
     }
-    data.cases = cases.filter(c => c.max > 500)
+    //data.cases = cases.filter(c => c.max > 500)
+    data.cases = cases
     timings.process = Date.now()
     data.cases.sort((a, b) => {
       if (a.rate > b.rate) return -1
@@ -344,7 +345,7 @@
 <body onload="onLoad()">
   <div id="display">COVID-19 Daily 1000's Cases Since 01 Jan 2020</div>
   <div class="sub">sorted by % change in 14 day MA in last 14 days</div>
-  <div class="sub">excluding countries where cases per day has never risen above 500</div>
+  <div class="sub">7 day MA in <span style="color: red; font-weight: bold">red</span>, 14 day MA in <span style="color: orange; font-weight: bold">orange</span></div>
   <div id="start"><table cellpadding="0" cellspacing="0"><tbody id="tblStart"></tbody></table></div>
 </body>
 </html>
