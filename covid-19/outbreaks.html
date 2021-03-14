@@ -1,0 +1,350 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="stylesheet" href="uPlot.min.css"></link>
+  <script src="uPlot.iife.min.js"></script>
+  <script src="stats.js"></script>
+  <style>
+    body {
+      font-family: monospace;
+      background-color: #f0f0f0;
+    }
+    div#start {
+      position: absolute;
+      top: 106px;
+      bottom: 10px;
+      right: 10px;
+      left: 10px;
+      padding: 0px;
+    }
+    div.sub {
+      left: 10px;
+      right: 10px;
+      text-align: center;
+      font-size: 12px;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+    div#display {
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      background-color: #c0c0c0;
+      color: black;
+      font-size: 24px;
+      text-align: center;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+    div#display span {
+      padding-left: 4px;
+    }
+    tr {
+      padding: 0px;
+    }
+    td {
+      padding: 0px;
+      border-bottom: 16px solid #f0f0f0;
+    }
+    table td.header {
+      padding-top: 16px;
+      padding-left: 8px;
+      padding-right: 8px;
+      text-align: center;
+      vertical-align: top;
+      width: 40px;
+      font-size: 12px;
+      color: black;
+      background-color: #c0c0c0;
+    }
+    table td.header span {
+      writing-mode: vertical-lr;
+      text-orientation: upright;
+    }
+  </style>
+</head>
+<script>
+  const config = {
+    //cases: 'time_series_covid19_confirmed_global.csv',
+    cases: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv',
+    logarithmic: false,
+    normalizeY: false
+  }
+  const data = {}
+  const begin = new Date('01/01/2020')
+  const stats = setupStats()
+
+  function daysBetween (start, end) {
+    return Math.ceil((end - start) / (1000 * 60 * 60 * 24))    
+  }
+
+  function drawGraph () {
+    const logarithmic = false
+    const start = 0
+    let cases = data.cases
+    const tbody = document.createElement('tbody')
+    const old = document.getElementById('tblStart')
+    old.parentNode.replaceChild(tbody, old)
+    tbody.id = 'tblStart'
+    drawRates(tbody)
+    for (let i = 0; i < cases.length; i++) {
+      drawSpark(tbody, cases[i])
+    }
+  }
+
+  function parseLine (line) {
+    let inField = false
+    const fields = []
+    let off = 0
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === ',') {
+        if (inField) continue
+        fields.push(line.slice(off, i))
+        off = i + 1
+        continue
+      }
+      if (line[i] === '"') {
+        if (inField) {
+          inField = false
+          continue
+        }
+        inField = true
+      }
+    }
+    fields.push(line.slice(off))
+    return fields
+  }
+
+  async function load (url) {
+    let res = await fetch(url)
+    let text = await res.text()
+    let lines = text.split('\n').map(line => line.trim()).filter(line => line)
+    const records = []
+    const headers = parseLine(lines.shift())
+    for (const line of lines) {
+      const record = {}
+      const fields = parseLine(line)
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i].match(/\d{1,2}\/\d{1,2}\/\d{1,2}/)) {
+          record[headers[i]] = parseInt(fields[i], 10)
+          continue
+        }
+        if (headers[i] === 'Province/State') {
+          record.province = fields[i].replace(/"/g, '')
+          continue
+        }
+        if (headers[i] === 'Country/Region') {
+          record.region = fields[i].replace(/"/g, '')
+        }
+      }
+      records.push(record)
+    }
+    return records
+  }
+
+  function normalize (data, index) {
+    const { region } = data
+    delete data.region
+    delete data.province
+    const keys = Object.keys(data)
+    const result = keys.map(k => {
+      return { value: data[k], date: k }
+    }).filter(v => v.value >= 5)
+    if (!result.length) return { region, max: 0, start: '', data: []}
+    const max = Math.max(...result.map(v => v.value - 5))
+    return { region, max, start: new Date(result[0].date), data: result.map(v => v.value - 5) }
+  }
+
+  function drawRates (tbody) {
+    const { cases } = data
+    const row = tbody.insertRow(-1)
+    let cell = row.insertCell(0)
+    const span = document.createElement('span')
+    span.innerText = '% Change 14d MA'
+    cell.appendChild(span)
+    cell.className = 'header'
+    const hide = { show: false }
+    const scales = {
+      x: {
+        time: false
+      },
+      y: {
+        time: false,
+        range: [-300,300]
+      }
+    }
+    const opts = {
+      width: window.innerWidth - 40 - 20,
+      height: 300,
+      scales,
+      axes: [
+        {
+          space: 20,
+          show: false
+        }, 
+        {
+          space: 20,
+          show: true
+        }
+      ],
+      series: [
+        {},
+        { stroke: '#ff0000', fill: '#ffbbbb' }
+      ]
+    }
+    const d = [[], []]
+    const series = cases.map(c => ({ rate: c.rate, region: c.region }))
+    for (let i = 0; i < series.length; i++) {
+      d[0][i] = i
+      d[1][i] = series[i].rate * 100
+    }
+    let u = new uPlot(opts, d)
+    cell = row.insertCell(1)
+    cell.appendChild(u.root.querySelector("canvas"))
+  }
+
+  function drawSpark (tbody, stat) {
+    const { region, start, data, max, ma7, ma14, rate } = stat
+    const row = tbody.insertRow(-1)
+
+    let cell = row.insertCell(0)
+    const span = document.createElement('span')
+    const labelName = region.slice(0, 20)
+    span.innerText = labelName
+    cell.appendChild(span)
+    cell.className = 'header'
+
+    const hide = { show: false }
+    const scales = {
+      x: {
+        time: false
+      },
+      y: {
+        time: false
+      }
+    }
+    if (config.normalizeY) {
+      scales.y.range = [0, 300000]
+    }
+    const dopts = { month: 'short', day: 'numeric' }
+    const opts = {
+      width: window.innerWidth - 40 - 20,
+      height: 300,
+      scales,
+      axes: [
+        {
+          space: 20,
+          show: true,
+          values: (self, ticks) => {
+            const len = ticks.length
+            return ticks.map((v, i) => {
+              if (v === 0) return `${v}\n${begin.toLocaleDateString('en-US', dopts)}`
+              if (i === len - 1) return `${v}\n${(new Date(begin.getTime() + (v * 1000 * 60 * 60 * 24))).toLocaleDateString('en-US', dopts)}`
+              if (v % 90 === 0) return `${v}\n${(new Date(begin.getTime() + (v * 1000 * 60 * 60 * 24))).toLocaleDateString('en-US', dopts)}`
+              return v
+            })
+          }
+        }, 
+        {
+          space: 20,
+          show: true,
+          values: (self, ticks) => {
+            return ticks.map(rawValue => rawValue / 1000)
+          }
+        }
+      ],
+      series: [
+        {},
+        { stroke: '#03a9f4', fill: '#b3e5fc' },
+        { stroke: 'red' },
+        { stroke: 'orange' }
+      ]
+    }
+    const d = [[], [], [], []]
+    for (let i = 0; i < data.length; i++) {
+      d[0][i] = i
+      d[1][i] = Math.max(data[i], 0)
+      d[2][i] = ma7[i]
+      d[3][i] = ma14[i]
+    }
+    let u = new uPlot(opts, d)
+    cell = row.insertCell(1)
+    cell.appendChild(u.root.querySelector("canvas"))
+
+    //cell = row.insertCell(2)
+    //cell.innerText = rate
+  }
+
+  function displayTimings (timings) {
+    const { start, load, process, sort, render } = timings
+    const html = []
+    html.push(`<span>load ${load - start}ms</span>`)
+    html.push(`<span>process ${process - load}ms</span>`)
+    html.push(`<span>sort ${sort - process}ms</span>`)
+    html.push(`<span>render ${render - sort}ms</span>`)
+    document.getElementById('display').innerHTML = html.join('')
+  }
+
+  async function onLoad () {
+    const timings = { start: Date.now() }
+    let start = Date.now()
+    let cases = await load(config.cases)
+    timings.load = Date.now()
+    cases = cases.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    for (let i = 0; i < cases.length; i++) {
+      const days = daysBetween(begin, cases[i].start)
+      const ma7 = []
+      const ma14 = []
+      const data = []
+      for (let j = 0; j < days; j++) cases[i].data.unshift(0)
+      for (let j = 0; j < cases[i].data.length; j++) {
+        if (j > 0) {
+          data[j] = Math.max(cases[i].data[j] - cases[i].data[j - 1], 0)
+        } else {
+          data[j] = Math.max(cases[i].data[j], 0)
+        }
+        //if (cases[i].region === 'Turkey') {
+          //if (data[j] > 100000) data[j] = 0
+        //}
+        if (j > 7) {
+          ma7[j] = stats.average(data.slice(j - 7, j))
+        } else {
+          ma7[j] = 0
+        }
+        if (j > 14) {
+          ma14[j] = stats.average(data.slice(j - 14, j))
+        } else {
+          ma14[j] = 0
+        }
+      }
+      cases[i].data = data
+      cases[i].max = stats.max(data)
+      cases[i].ma7 = ma7
+      cases[i].ma14 = ma14
+      //cases[i].rate = ma7[ma7.length - 1] - ma7[ma7.length - 8]
+      if (ma7[ma7.length - 1] === 0 || ma7[ma7.length - 11] === 0) {
+        cases[i].rate = 0  
+      } else {
+        cases[i].rate = (ma14[ma14.length - 1] - ma14[ma14.length - 15]) / ma14[ma14.length - 15]
+      }
+    }
+    data.cases = cases.filter(c => c.max > 500)
+    timings.process = Date.now()
+    data.cases.sort((a, b) => {
+      if (a.rate > b.rate) return -1
+      if (a.rate < b.rate) return 1
+      return 0
+    })
+    timings.sort = Date.now()
+    drawGraph()
+    timings.render = Date.now()
+    //displayTimings(timings)
+  }
+</script>
+<body onload="onLoad()">
+  <div id="display">COVID-19 Daily 1000's Cases Since 01 Jan 2020</div>
+  <div class="sub">sorted by % change in 14 day MA in last 14 days</div>
+  <div class="sub">excluding countries where cases per day has never risen above 500</div>
+  <div id="start"><table cellpadding="0" cellspacing="0"><tbody id="tblStart"></tbody></table></div>
+</body>
+</html>
