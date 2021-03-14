@@ -11,24 +11,24 @@
     }
     div#start {
       position: absolute;
-      top: 106px;
-      bottom: 10px;
-      right: 10px;
-      left: 10px;
+      top: 132px;
+      bottom: 8px;
+      right: 8px;
+      left: 8px;
       padding: 0px;
     }
     div.sub {
-      left: 10px;
-      right: 10px;
+      left: 8px;
+      right: 8px;
       text-align: center;
       font-size: 12px;
       padding-top: 8px;
       padding-bottom: 8px;
     }
     div#display {
-      top: 10px;
-      left: 10px;
-      right: 10px;
+      top: 8px;
+      left: 8px;
+      right: 8px;
       background-color: #c0c0c0;
       color: black;
       font-size: 24px;
@@ -39,12 +39,12 @@
     div#display span {
       padding-left: 4px;
     }
-    tr {
-      padding: 0px;
-    }
     td {
       padding: 0px;
-      border-bottom: 16px solid #f0f0f0;
+      border-bottom: 8px solid #f0f0f0;
+    }
+    table tr {
+      padding: 0px;
     }
     table td.header {
       padding-top: 16px;
@@ -61,11 +61,16 @@
       writing-mode: vertical-lr;
       text-orientation: upright;
     }
+    canvas {
+      background-color: #f0f0f0;
+    }
   </style>
 </head>
 <script>
   const config = {
     //cases: 'time_series_covid19_confirmed_global.csv',
+    //deaths: 'time_series_covid19_deaths_global.csv',
+    deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv',
     cases: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv',
     logarithmic: false,
     normalizeY: false
@@ -81,14 +86,17 @@
   function drawGraph () {
     const logarithmic = false
     const start = 0
-    let cases = data.cases
+    const { cases, deaths } = data
     const tbody = document.createElement('tbody')
     const old = document.getElementById('tblStart')
     old.parentNode.replaceChild(tbody, old)
     tbody.id = 'tblStart'
-    drawRates(tbody)
+    drawRates(tbody, cases, { stroke: '#03a9f4', fill: '#b3e5fc' })
+    drawRates(tbody, deaths, { stroke: 'green', fill: '#b0cc7e' })
     for (let i = 0; i < cases.length; i++) {
-      drawSpark(tbody, cases[i])
+      const cell = drawSpark(tbody, cases[i])
+      const range = deaths.find(d => d.region === cases[i].region)
+      if (range) drawDeaths(cell, range)
     }
   }
 
@@ -155,8 +163,7 @@
     return { region, max, start: new Date(result[0].date), data: result.map(v => v.value - 5) }
   }
 
-  function drawRates (tbody) {
-    const { cases } = data
+  function drawRates (tbody, cases, colors) {
     const row = tbody.insertRow(-1)
     let cell = row.insertCell(0)
     const span = document.createElement('span')
@@ -169,8 +176,7 @@
         time: false
       },
       y: {
-        time: false,
-        range: [-600,600]
+        time: false
       }
     }
     const opts = {
@@ -189,7 +195,7 @@
       ],
       series: [
         {},
-        { stroke: '#ff0000', fill: '#ffbbbb' }
+        colors
       ]
     }
     const d = [[], []]
@@ -249,7 +255,7 @@
           space: 20,
           show: true,
           values: (self, ticks) => {
-            return ticks.map(rawValue => rawValue / 1000)
+            return ticks.map(rawValue => Math.floor(rawValue / 10) / 100)
           }
         }
       ],
@@ -270,9 +276,54 @@
     let u = new uPlot(opts, d)
     cell = row.insertCell(1)
     cell.appendChild(u.root.querySelector("canvas"))
+    return cell
+  }
 
-    //cell = row.insertCell(2)
-    //cell.innerText = rate
+  function drawDeaths (cell, stat) {
+    const { region, start, data, max, ma7, ma14, rate } = stat
+    const hide = { show: false }
+    const scales = {
+      x: {
+        time: false
+      },
+      y: {
+        time: false
+      }
+    }
+    if (config.normalizeY) {
+      scales.y.range = [0, 300000]
+    }
+    const dopts = { month: 'short', day: 'numeric' }
+    const opts = {
+      width: window.innerWidth - 40 - 20,
+      height: 150,
+      scales,
+      axes: [
+        {
+          space: 20,
+          show: true
+        }, 
+        {
+          space: 20,
+          show: true
+        }
+      ],
+      series: [
+        {},
+        { stroke: 'green', fill: '#b0cc7e' },
+        { stroke: 'red' },
+        { stroke: 'orange' }
+      ]
+    }
+    const d = [[], [], [], []]
+    for (let i = 0; i < data.length; i++) {
+      d[0][i] = i
+      d[1][i] = Math.max(data[i], 0)
+      d[2][i] = ma7[i]
+      d[3][i] = ma14[i]
+    }
+    let u = new uPlot(opts, d)
+    cell.appendChild(u.root.querySelector("canvas"))
   }
 
   function displayTimings (timings) {
@@ -285,12 +336,7 @@
     document.getElementById('display').innerHTML = html.join('')
   }
 
-  async function onLoad () {
-    const timings = { start: Date.now() }
-    let start = Date.now()
-    let cases = await load(config.cases)
-    timings.load = Date.now()
-    cases = cases.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+  function processData (cases) {
     for (let i = 0; i < cases.length; i++) {
       const days = daysBetween(begin, cases[i].start)
       const ma7 = []
@@ -303,9 +349,6 @@
         } else {
           data[j] = Math.max(cases[i].data[j], 0)
         }
-        //if (cases[i].region === 'Turkey') {
-          //if (data[j] > 100000) data[j] = 0
-        //}
         if (j > 7) {
           ma7[j] = stats.average(data.slice(j - 7, j))
         } else {
@@ -321,21 +364,31 @@
       cases[i].max = stats.max(data)
       cases[i].ma7 = ma7
       cases[i].ma14 = ma14
-      //cases[i].rate = ma7[ma7.length - 1] - ma7[ma7.length - 8]
       if (ma7[ma7.length - 1] === 0 || ma7[ma7.length - 11] === 0) {
         cases[i].rate = 0  
       } else {
         cases[i].rate = (ma14[ma14.length - 1] - ma14[ma14.length - 15]) / ma14[ma14.length - 15]
       }
     }
-    //data.cases = cases.filter(c => c.max > 500)
-    data.cases = cases
-    timings.process = Date.now()
-    data.cases.sort((a, b) => {
+    cases.sort((a, b) => {
       if (a.rate > b.rate) return -1
       if (a.rate < b.rate) return 1
       return 0
     })
+    return cases
+  }
+
+  async function onLoad () {
+    const timings = { start: Date.now() }
+    let start = Date.now()
+    let cases = await load(config.cases)
+    let deaths = await load(config.deaths)
+    timings.load = Date.now()
+    cases = cases.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    deaths = deaths.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    data.cases = processData(cases)
+    data.deaths = processData(deaths)
+    timings.process = Date.now()
     timings.sort = Date.now()
     drawGraph()
     timings.render = Date.now()
@@ -343,8 +396,9 @@
   }
 </script>
 <body onload="onLoad()">
-  <div id="display">COVID-19 Daily 1000's Cases Since 01 Jan 2020</div>
+  <div id="display">COVID-19 Daily 1000's Cases & Deaths Since 01 Jan 2020</div>
   <div class="sub">sorted by % change in 14 day MA in last 14 days</div>
+  <div class="sub">cases in <span style="color: #03a9f4; font-weight: bold">blue</span>, deaths in <span style="color: green; font-weight: bold">green</span></div>
   <div class="sub">7 day MA in <span style="color: red; font-weight: bold">red</span>, 14 day MA in <span style="color: orange; font-weight: bold">orange</span></div>
   <div id="start"><table cellpadding="0" cellspacing="0"><tbody id="tblStart"></tbody></table></div>
 </body>
