@@ -9,13 +9,6 @@
       font-family: monospace;
       background-color: #f0f0f0;
     }
-    div.header {
-      left: 0px;
-      right: 0px;
-      top: 0px;
-      position: fixed;
-      z-index: 1000;
-    }
     div#start {
       position: absolute;
       top: 170px;
@@ -64,9 +57,10 @@
       color: black;
       background-color: #c0c0c0;
     }
-    table td.header span {
+    table td.header a {
       writing-mode: vertical-lr;
       text-orientation: upright;
+      text-decoration: none;
     }
     canvas {
       background-color: #f0f0f0;
@@ -85,9 +79,14 @@
   const data = {}
   const begin = new Date('01/01/2020')
   const stats = setupStats()
+  let settings = { filters: { regions: {} }}
 
   function daysBetween (start, end) {
     return Math.ceil((end - start) / (1000 * 60 * 60 * 24))    
+  }
+
+  function save (key = 'covid-19.settings') {
+    localStorage.setItem(key, JSON.stringify(settings))
   }
 
   function drawGraph () {
@@ -170,13 +169,41 @@
     return { region, max, start: new Date(result[0].date), data: result.map(v => v.value - 5) }
   }
 
+  // Helper function:
+  function upTo(el, tagName) {
+    tagName = tagName.toLowerCase()
+    while (el && el.parentNode) {
+      el = el.parentNode
+      if (el.tagName && el.tagName.toLowerCase() == tagName) {
+        return el
+      }
+    }
+    return null
+  }    
+
+  function deleteRow (el) {
+    let row = upTo(el, 'tr')
+    const previous = row.previousSibling
+    const next = row.nextSibling
+    if (row) row.parentNode.removeChild(row)
+    row = next || previous
+    if (!row) return
+    setTimeout(() => row.scrollIntoView(true), 100)
+  }
+
   function drawRates (tbody, cases, colors) {
     const row = tbody.insertRow(-1)
     let cell = row.insertCell(0)
-    const span = document.createElement('span')
-    span.innerText = '% Change 14d MA'
-    cell.appendChild(span)
+
+    const anchor = document.createElement('a')
+    anchor.innerText = '% Change 14d MA'
+    anchor.href = "#"
+    anchor.onclick = function () {
+      return deleteRow(this)
+    }
+    cell.appendChild(anchor)
     cell.className = 'header'
+
     const hide = { show: false }
     const scales = {
       x: {
@@ -220,11 +247,16 @@
     const { region, start, data, max, ma7, ma14, rate } = stat
     const row = tbody.insertRow(-1)
 
-    let cell = row.insertCell(0)
-    const span = document.createElement('span')
     const labelName = region.slice(0, 20)
-    span.innerText = labelName
-    cell.appendChild(span)
+    let cell = row.insertCell(0)
+    const anchor = document.createElement('a')
+    anchor.innerText = labelName
+    anchor.href = "#"
+    anchor.onclick = function () {
+      settings.filters.regions[region] = true
+      return deleteRow(this)
+    }
+    cell.appendChild(anchor)
     cell.className = 'header'
 
     const hide = { show: false }
@@ -333,16 +365,6 @@
     cell.appendChild(u.root.querySelector("canvas"))
   }
 
-  function displayTimings (timings) {
-    const { start, load, process, sort, render } = timings
-    const html = []
-    html.push(`<span>load ${load - start}ms</span>`)
-    html.push(`<span>process ${process - load}ms</span>`)
-    html.push(`<span>sort ${sort - process}ms</span>`)
-    html.push(`<span>render ${render - sort}ms</span>`)
-    document.getElementById('display').innerHTML = html.join('')
-  }
-
   function processData (cases) {
     for (let i = 0; i < cases.length; i++) {
       const days = daysBetween(begin, cases[i].start)
@@ -356,6 +378,12 @@
         } else {
           data[j] = Math.max(cases[i].data[j], 0)
         }
+
+        if (cases[i].region === 'Turkey') {
+          if (data[j] > 100000) data[j] = 0
+        }
+
+
         if (j > 7) {
           ma7[j] = stats.average(data.slice(j - 7, j))
         } else {
@@ -386,30 +414,41 @@
   }
 
   async function onLoad () {
-    const timings = { start: Date.now() }
-    let start = Date.now()
+    const json = localStorage.getItem('covid-19.settings')
+    if (json) {
+      settings = JSON.parse(json)
+    }
     let cases = await load(config.cases)
     let deaths = await load(config.deaths)
-    timings.load = Date.now()
     cases = cases.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    cases = cases.filter(row => !settings.filters.regions[row.region])
     deaths = deaths.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    deaths = deaths.filter(row => !settings.filters.regions[row.region])
     data.cases = processData(cases)
     data.deaths = processData(deaths)
-    timings.process = Date.now()
-    timings.sort = Date.now()
     drawGraph()
-    timings.render = Date.now()
-    //displayTimings(timings)
+    document.body.addEventListener('keydown', event => {
+      if (event.key === 'C' && event.ctrlKey) {
+        event.preventDefault()
+        toggleControlPanel()
+        return
+      }
+      if (event.key === 's' && event.ctrlKey) {
+        document.body.style.backgroundColor = 'green'
+        setTimeout(() => document.body.style.backgroundColor = '#d0d0d0', 200)
+        event.preventDefault()
+        save()
+        return
+      }
+    })
   }
 </script>
 <body onload="onLoad()">
-  <div class="header">
   <div id="display">COVID-19 Daily 1000's Cases & Deaths Since 01 Jan 2020</div>
   <div class="sub">sorted by % change in 14 day MA in last 14 days</div>
   <div class="sub">cases in <span style="color: #03a9f4; font-weight: bold">blue</span>, deaths in <span style="color: green; font-weight: bold">green</span></div>
   <div class="sub">7 day MA in <span style="color: red; font-weight: bold">red</span>, 14 day MA in <span style="color: orange; font-weight: bold">orange</span></div>
   <div class="sub">data updated daily from <a href="https://github.com/CSSEGISandData/COVID-19">John Hopkins Whiting School of Engineering</a></div>
-  </div>
   <div id="start"><table cellpadding="0" cellspacing="0"><tbody id="tblStart"></tbody></table></div>
 </body>
 </html>
