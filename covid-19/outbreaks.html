@@ -9,6 +9,13 @@
       font-family: monospace;
       background-color: #f0f0f0;
     }
+    div.header {
+      left: 0px;
+      right: 0px;
+      top: 0px;
+      position: fixed;
+      z-index: 1000;
+    }
     div#start {
       position: absolute;
       top: 170px;
@@ -396,11 +403,13 @@
   }
 </script>
 <body onload="onLoad()">
+  <div class="header">
   <div id="display">COVID-19 Daily 1000's Cases & Deaths Since 01 Jan 2020</div>
   <div class="sub">sorted by % change in 14 day MA in last 14 days</div>
   <div class="sub">cases in <span style="color: #03a9f4; font-weight: bold">blue</span>, deaths in <span style="color: green; font-weight: bold">green</span></div>
   <div class="sub">7 day MA in <span style="color: red; font-weight: bold">red</span>, 14 day MA in <span style="color: orange; font-weight: bold">orange</span></div>
   <div class="sub">data updated daily from <a href="https://github.com/CSSEGISandData/COVID-19">John Hopkins Whiting School of Engineering</a></div>
+  </div>
   <div id="start"><table cellpadding="0" cellspacing="0"><tbody id="tblStart"></tbody></table></div>
 </body>
 </html>
