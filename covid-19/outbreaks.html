@@ -2,6 +2,7 @@
 <html>
 <head>
   <link rel="stylesheet" href="uPlot.min.css"></link>
+	<script src='https://cdn.plot.ly/plotly-latest.min.js'></script>
   <script src="uPlot.iife.min.js"></script>
   <script src="stats.js"></script>
   <style>
@@ -9,9 +10,17 @@
       font-family: monospace;
       background-color: #f0f0f0;
     }
-    div#start {
+    div#map {
       position: absolute;
       top: 170px;
+      right: 8px;
+      left: 8px;
+      height: 800px;
+      background-color: #f0f0f0;
+    }
+    div#start {
+      position: absolute;
+      top: 1070px;
       bottom: 8px;
       right: 8px;
       left: 8px;
@@ -69,10 +78,10 @@
 </head>
 <script>
   const config = {
-    //cases: 'time_series_covid19_confirmed_global.csv',
-    //deaths: 'time_series_covid19_deaths_global.csv',
-    deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv',
-    cases: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv',
+    cases: 'time_series_covid19_confirmed_global.csv',
+    deaths: 'time_series_covid19_deaths_global.csv',
+    //deaths: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv',
+    //cases: 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv',
     logarithmic: false,
     normalizeY: false
   }
@@ -104,6 +113,53 @@
       const range = deaths.find(d => d.region === cases[i].region)
       if (range) drawDeaths(cell, range)
     }
+  }
+
+  function drawMap () {
+    const { cases, deaths } = data
+    const opts = [{
+        type: 'choropleth',
+        locationmode: 'country names',
+        locations: cases.map(c => c.region),
+        z: cases.map(c => c.rate),
+        text: cases.map(c => c.region),
+        colorscale: [
+          ['0.0', 'rgb(9,50,3'],
+          ['0.1', 'rgb(150,135,5)'],
+          ['0.3', 'rgb(255,88,51)'],
+          ['0.4', 'rgb(255,36,26)'],
+          ['0.5', 'rgb(255,134,77)'],
+          ['1.0', 'rgb(255,235,153)']
+        ]
+    }]
+    const layout = {
+      font: {
+        family: 'monospace',
+        size: 10
+      },
+      title: '% Change in 14 day MA of cases in past 14 days',
+      paper_bgcolor: '#f0f0f0',
+      geo: {
+        bgcolor: '#f0f0f0',
+        showframe: false,
+        showocean: true,
+        oceancolor: '#f0f0f0',
+        showlakes: true,
+        lakecolor: '#f0f0f0',
+        center: {
+          lat: 45.16,
+          lon: 9.19
+        },
+        projection: {
+          type: 'winkel tripel',
+          scale: 3
+        }
+      }
+    }
+    Plotly.newPlot('map', opts, layout, { showLink: false })
+    document.getElementById('map').on('plotly_doubleclick', function (data) {
+      location.hash = `row${data.points[0].location}`
+    })
   }
 
   function parseLine (line) {
@@ -246,7 +302,7 @@
   function drawSpark (tbody, stat) {
     const { region, start, data, max, ma7, ma14, rate } = stat
     const row = tbody.insertRow(-1)
-
+    row.id = `row${region}`
     const labelName = region.slice(0, 20)
     let cell = row.insertCell(0)
     const anchor = document.createElement('a')
@@ -399,8 +455,12 @@
       cases[i].max = stats.max(data)
       cases[i].ma7 = ma7
       cases[i].ma14 = ma14
-      if (ma7[ma7.length - 1] === 0 || ma7[ma7.length - 11] === 0) {
-        cases[i].rate = 0  
+      if (ma14[ma14.length - 1] === 0 && ma14[ma14.length - 15] === 0) {
+        cases[i].rate = 0
+      } else if (ma14[ma14.length - 1] === 0) {
+        cases[i].rate = 1
+      } else if (ma14[ma14.length - 15] === 0) {
+        cases[i].rate = -1
       } else {
         cases[i].rate = (ma14[ma14.length - 1] - ma14[ma14.length - 15]) / ma14[ma14.length - 15]
       }
@@ -420,13 +480,14 @@
     }
     let cases = await load(config.cases)
     let deaths = await load(config.deaths)
-    cases = cases.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    cases = cases.filter(v => (!v.province)).map(normalize).filter(v => v.start)
     cases = cases.filter(row => !settings.filters.regions[row.region])
-    deaths = deaths.filter(v => (!v.province || v.province === 'Hubei')).map(normalize).filter(v => v.start)
+    deaths = deaths.filter(v => (!v.province)).map(normalize).filter(v => v.start)
     deaths = deaths.filter(row => !settings.filters.regions[row.region])
     data.cases = processData(cases)
     data.deaths = processData(deaths)
     drawGraph()
+    drawMap()
     document.body.addEventListener('keydown', event => {
       if (event.key === 'C' && event.ctrlKey) {
         event.preventDefault()
@@ -449,6 +510,7 @@
   <div class="sub">cases in <span style="color: #03a9f4; font-weight: bold">blue</span>, deaths in <span style="color: green; font-weight: bold">green</span></div>
   <div class="sub">7 day MA in <span style="color: red; font-weight: bold">red</span>, 14 day MA in <span style="color: orange; font-weight: bold">orange</span></div>
   <div class="sub">data updated daily from <a href="https://github.com/CSSEGISandData/COVID-19">John Hopkins Whiting School of Engineering</a></div>
+  <div id="map"></div>
   <div id="start"><table cellpadding="0" cellspacing="0"><tbody id="tblStart"></tbody></table></div>
 </body>
 </html>
