@@ -12,25 +12,30 @@
     }
     div#map {
       position: absolute;
-      top: 170px;
+      top: 56px;
       right: 8px;
       left: 8px;
-      height: 800px;
+      height: 600px;
       background-color: #f0f0f0;
     }
     div#start {
       position: absolute;
-      top: 1070px;
+      top: 666px;
       bottom: 8px;
       right: 8px;
       left: 8px;
       padding: 0px;
     }
     div.sub {
+      position: absolute;
+      top: 56px;
       left: 8px;
       right: 8px;
       text-align: center;
       font-size: 12px;
+      display: none;
+    }
+    div.sub2 {
       padding-top: 8px;
       padding-bottom: 8px;
     }
@@ -115,7 +120,7 @@
     }
   }
 
-  function drawMap () {
+  function drawMap (lat = 45.16, lon = 9.19) {
     const { cases, deaths } = data
     const opts = [{
         type: 'choropleth',
@@ -124,12 +129,10 @@
         z: cases.map(c => c.rate),
         text: cases.map(c => c.region),
         colorscale: [
-          ['0.0', 'rgb(9,50,3'],
-          ['0.1', 'rgb(150,135,5)'],
-          ['0.3', 'rgb(255,88,51)'],
-          ['0.4', 'rgb(255,36,26)'],
-          ['0.5', 'rgb(255,134,77)'],
-          ['1.0', 'rgb(255,235,153)']
+          ['0.0', 'green'],
+          ['0.1', 'yellow'],
+          ['0.3', 'orange'],
+          ['1.0', 'red']
         ]
     }]
     const layout = {
@@ -143,22 +146,23 @@
         bgcolor: '#f0f0f0',
         showframe: false,
         showocean: true,
-        oceancolor: '#f0f0f0',
+        oceancolor: '#d5f7f7',
         showlakes: true,
-        lakecolor: '#f0f0f0',
-        center: {
-          lat: 45.16,
-          lon: 9.19
-        },
+        lakecolor: '#d5f7f7',
+        center: { lat, lon },
         projection: {
           type: 'winkel tripel',
-          scale: 3
+          scale: 4
         }
       }
     }
     Plotly.newPlot('map', opts, layout, { showLink: false })
+    let currentLocation = ''
+    document.getElementById('map').on('plotly_click', function (data) {
+      currentLocation = `row${data.points[0].location}`
+    })
     document.getElementById('map').on('plotly_doubleclick', function (data) {
-      location.hash = `row${data.points[0].location}`
+      location.hash = currentLocation
     })
   }
 
@@ -210,19 +214,6 @@
       records.push(record)
     }
     return records
-  }
-
-  function normalize (data, index) {
-    const { region } = data
-    delete data.region
-    delete data.province
-    const keys = Object.keys(data)
-    const result = keys.map(k => {
-      return { value: data[k], date: k }
-    }).filter(v => v.value >= 5)
-    if (!result.length) return { region, max: 0, start: '', data: []}
-    const max = Math.max(...result.map(v => v.value - 5))
-    return { region, max, start: new Date(result[0].date), data: result.map(v => v.value - 5) }
   }
 
   // Helper function:
@@ -375,7 +366,7 @@
   }
 
   function drawDeaths (cell, stat) {
-    const { region, start, data, max, ma7, ma14, rate } = stat
+    const { region, start, data, ma7, ma14, rate } = stat
     const hide = { show: false }
     const scales = {
       x: {
@@ -421,7 +412,62 @@
     cell.appendChild(u.root.querySelector("canvas"))
   }
 
+  function normalize (data, index) {
+    const { region } = data
+    delete data.region
+    delete data.province
+    const keys = Object.keys(data)
+    const result = keys.map(k => {
+      return { value: data[k], date: k }
+    })
+    if (!result.length) {
+      return { region, start: '', data: []}
+    }
+    return { region, start: new Date(result[0].date), data: result.map(v => v.value) }
+  }
+
+
   function processData (cases) {
+    const regions = {}
+    for (const row of cases) {
+      const { region, province } = row
+      delete row.region
+      delete row.province
+      const dates = Object.keys(row)
+      let result
+      if (province) {
+        if (['united kingdom', 'france', 'netherlands', 'denmark'].find(c => (c === region.toLowerCase()))) {
+          result = regions[province] = { region: province, data: {} }
+        } else {
+          result = regions[region]
+          if (!result) result = regions[region] = { region, data: {} }
+        }
+      } else {
+        result = regions[region] = { region, data: {} }
+      }
+      for (const date of dates) {
+        if (result.data[date]) {
+          result.data[date] += row[date]
+        } else {
+          result.data[date] = row[date]
+        }
+      }
+    }
+    for (const key of Object.keys(regions)) {
+      const region = regions[key]
+      region.data = Object.keys(region.data).map(k => {
+        const date = new Date(k)
+        return { date, value: region.data[k] }
+      }).sort((a, b) => {
+        if (a.date < b.date) return -1
+        if (a.date > b.date) return 1
+        return 0
+      })
+      region.start = region.data[0].date
+      region.data = region.data.map(v => v.value)
+      console.log(region.start)
+    }
+    cases = Object.keys(regions).map(k => regions[k]).filter(row => !settings.filters.regions[row.region])
     for (let i = 0; i < cases.length; i++) {
       const days = daysBetween(begin, cases[i].start)
       const ma7 = []
@@ -438,8 +484,6 @@
         if (cases[i].region === 'Turkey') {
           if (data[j] > 100000) data[j] = 0
         }
-
-
         if (j > 7) {
           ma7[j] = stats.average(data.slice(j - 7, j))
         } else {
@@ -473,6 +517,19 @@
     return cases
   }
 
+  function getGeo () {
+    return new Promise ((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const { coords } = pos
+        resolve(coords)
+      }, reject, {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      })
+    })
+  }
+
   async function onLoad () {
     const json = localStorage.getItem('covid-19.settings')
     if (json) {
@@ -480,14 +537,11 @@
     }
     let cases = await load(config.cases)
     let deaths = await load(config.deaths)
-    cases = cases.filter(v => (!v.province)).map(normalize).filter(v => v.start)
-    cases = cases.filter(row => !settings.filters.regions[row.region])
-    deaths = deaths.filter(v => (!v.province)).map(normalize).filter(v => v.start)
-    deaths = deaths.filter(row => !settings.filters.regions[row.region])
     data.cases = processData(cases)
     data.deaths = processData(deaths)
     drawGraph()
-    drawMap()
+    const { latitude, longitude } = await getGeo()
+    drawMap(latitude, longitude)
     document.body.addEventListener('keydown', event => {
       if (event.key === 'C' && event.ctrlKey) {
         event.preventDefault()
@@ -506,11 +560,13 @@
 </script>
 <body onload="onLoad()">
   <div id="display">COVID-19 Daily 1000's Cases & Deaths Since 01 Jan 2020</div>
-  <div class="sub">sorted by % change in 14 day MA in last 14 days</div>
-  <div class="sub">cases in <span style="color: #03a9f4; font-weight: bold">blue</span>, deaths in <span style="color: green; font-weight: bold">green</span></div>
-  <div class="sub">7 day MA in <span style="color: red; font-weight: bold">red</span>, 14 day MA in <span style="color: orange; font-weight: bold">orange</span></div>
-  <div class="sub">data updated daily from <a href="https://github.com/CSSEGISandData/COVID-19">John Hopkins Whiting School of Engineering</a></div>
   <div id="map"></div>
+  <div class="sub">
+    <div class="sub2">sorted by % change in 14 day MA in last 14 days</div>
+    <div class="sub2">cases in <span style="color: #03a9f4; font-weight: bold">blue</span>, deaths in <span style="color: green; font-weight: bold">green</span></div>
+    <div class="sub2">7 day MA in <span style="color: red; font-weight: bold">red</span>, 14 day MA in <span style="color: orange; font-weight: bold">orange</span></div>
+    <div class="sub2">data updated daily from <a href="https://github.com/CSSEGISandData/COVID-19">John Hopkins Whiting School of Engineering</a></div>
+  </div>
   <div id="start"><table cellpadding="0" cellspacing="0"><tbody id="tblStart"></tbody></table></div>
 </body>
 </html>
