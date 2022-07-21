@@ -10,7 +10,7 @@ let db
 async function init () {
   importScripts('dist/sqlite3.js')
   await sqlite3.load(file => `dist/sqlite3.wasm`)
-  db = new sqlite3.open('https://billywhizz.io/techempower/clock.db')
+  db = new sqlite3.open('clock.db')
   db.exec = sql => {
     const stmt = db.prepare(sql)
     const rows = []
