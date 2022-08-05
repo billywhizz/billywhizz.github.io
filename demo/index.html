@@ -1,28 +1,113 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset='utf-8'>
-    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <title>sqlite3.js</title>
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
-  </head>
-  <body>
-<script type="text/javascript">
-async function main () {
-  const worker = new Worker('worker.js')
-  worker.onmessage = e => {
-    console.log(JSON.stringify(e.data))
-  }
-  worker.onerror = e => console.log("Worker error: ", e)
-  document.getElementById('query').onclick = e => {
-    const sql = document.getElementById('sql').value
-    worker.postMessage(sql)
-  }
+<head>
+<meta charset='utf-8'>
+<meta http-equiv='X-UA-Compatible' content='IE=edge'>
+<title>QuilLS</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,AAABAAEAEBAQAAEABAAoAQAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAgAAAAAAAAAAAAAAAEAAAAAAAAAAA4f8AAAAAAP+EAAAAAP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAERERERERERERESIiIiIREREREiIiIRERERERMzMRERESERMwAzERIRIhEzADMRIhEiEzAzAzEiESIzMzMzMyIRIjMzMzMzIhEiMzMzMzMiESIzADMAMyIRITMAMwAzEhERMzMzMzMRERERIiIiERERERIiIiIhERERERERERERH//wAA8A8AAPgfAAD8PwAAuB0AAJgZAACQCQAAgAEAAIABAACAAQAAgAEAAKAFAADgBwAA+B8AAPAPAAD//wAA" />
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    font-family: monospace;
 }
-window.onload = e => main().catch(err => console.error(err.stack))
-</script>
-
-  <textarea id="sql" cols="80" rows="30">SELECT DATE('now') AS now</textarea>
-  <button id="query">Query</button>
-  </body>
+body {
+  background-color: #c0c0c0;
+}
+div#sql {
+  position: absolute;
+  left: 10px;
+  right: 320px;
+  top: 10px;
+  height: 260px;
+  overflow: auto;
+}
+pre#results {
+  position: absolute;
+  left: 10px;
+  right: 320px;
+  bottom: 10px;
+  top: calc(280px + 10pt + 4px + 10px);
+  background-color: #f0f0f0;
+  overflow: auto;
+}
+div#status {
+  position: absolute;
+  left: 10px;
+  right: 320px;
+  height: calc(10pt + 4px);
+  font-size: 10pt;
+  top: 280px;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+div#wal {
+  position: absolute;
+  width: 300px;
+  right: 10px;
+  top: 10px;
+  bottom: 10px;
+  background-color: #f0f0f0;
+}
+span.label {
+  font-weight: bold;
+  width: 200px;
+}
+h2.logo {
+  text-align: right;
+  background-color: #a6cea3;
+  padding-top: 4px;
+  color: #313f30;
+  font-size: 24pt;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+h3.sub {
+  text-align: right;
+  background-color: #a6cea3;
+  font-size: 9pt;
+  font-style: italic;
+  color: #5a6958;
+  padding-bottom: 16px;
+  border-bottom: 10px solid #5a6958;
+}
+td.header {
+  font-weight: bold;
+}
+table.walInfo {
+  width: 100%;
+  padding: 4px;
+}
+span#statusTime {
+  position: absolute;
+  right: 10px;
+  text-align: right;
+}
+span#statusError {
+  position: absolute;
+  left: 10px;
+  text-align: left;
+  display: none;
+  color: #f0f0f0;
+  background-color: rgba(255, 0, 0, 0.63);
+}
+</style>
+<script src="ace.js" defer="true"></script>
+</head>
+<body>
+<script type="module" src="index.js"></script>
+<div id="sql"></div>
+<div id="status">
+<span id="statusError"></span>
+<span id="statusTime"></span>
+</div>
+<pre id="results"></pre>
+<div id="wal">
+<h2 class="logo">QuiLlS</h2>
+<h3 class="sub">a WASM SQLite adventure...</h3>
+<div id="walInfo"></div>
+<input type="file" id="file-selector">
+</div>
+</body>
 </html>
