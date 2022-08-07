@@ -4,11 +4,17 @@ function fileName (path) {
   return path.slice(path.lastIndexOf('/') + 1)
 }
 
+function formatSize (value) {
+  if (value > (1024 * 1024)) return `${Math.floor(value / (1024 * 1024))}M`
+  if (value > 1024) return `${Math.floor(value / 1024)}K`
+  return Math.floor(value)
+}
+
 async function main () {
   init()
   function displayWal (wal) {
     const { pageSize, checkpointSequence, counter, mxFrame, nPage, backfill, backfillAttempt, stats } = wal
-    const dbSize = Math.floor((nPage * pageSize) / (1024 * 1024) * 1000) / 1000
+    const dbSize = nPage * pageSize
     document.getElementById('walInfo').innerHTML = `
 <table class="walInfo">
 <tr>
@@ -30,7 +36,7 @@ async function main () {
 <td class="header">db pages</td><td align="right">${nPage}</td>
 </tr>
 <tr>
-<td class="header">db size (MB)</td><td align="right">${Math.floor(dbSize)}</td>
+<td class="header">db size</td><td align="right">${formatSize(dbSize)}</td>
 </tr>
 <tr>
 <td class="header">backfill</td><td align="right">${backfill}</td>
@@ -99,11 +105,13 @@ async function main () {
   if (url.hash) {
     dbName = url.hash.slice(1)
   }
+  const db = new Database()
+  await db.open(dbName)
 
-  const editor = window.ace.edit('sql')
+  const editor = window.ace.edit('editor')
   editor.setTheme('ace/theme/monokai')
   editor.session.setMode('ace/mode/sql')
-  editor.setValue("select type, name from sqlite_schema")
+  editor.setValue("pragma table_list")
   editor.setOptions({
     fontFamily: 'monospace',
     fontSize: '10pt',
@@ -131,8 +139,6 @@ async function main () {
     fileSelector.value = null
   })
 
-  const db = new Database()
-  await db.open(dbName)
   const status = document.getElementById('statusTime')
   async function runQuery () {
     document.getElementById('statusError').style.display = 'none'
@@ -191,5 +197,24 @@ async function main () {
     }
   })
   runQuery()
+  document.getElementById('editor').style.display = 'block'
+  delete editor.commands.commandKeyBinding['ctrl-e']
+  delete editor.commands.commandKeyBinding['ctrl-i']
+  delete editor.commands.commandKeyBinding['ctrl-j']
+  delete editor.commands.commandKeyBinding['ctrl-h']
+  delete editor.commands.commandKeyBinding['ctrl-s']
+  document.getElementsByTagName("html")[0].style.visibility = 'visible'
 }
 window.onload = () => main().catch(err => console.error(err.stack))
+
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    console.log('This page was restored from the bfcache.')
+  } else {
+    console.log('This page was loaded normally.')
+  }
+})
+
+window.addEventListener('pagehide', (event) => {
+  console.log('page is being hidden')
+})

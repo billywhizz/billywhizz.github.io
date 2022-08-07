@@ -12,6 +12,7 @@
     padding: 0;
     font-family: monospace;
 }
+html { visibility:hidden; }
 body {
   background-color: #c0c0c0;
 }
@@ -22,6 +23,12 @@ div#sql {
   top: 10px;
   height: 260px;
   overflow: auto;
+  background-color: #272822;
+}
+div#editor {
+  display: none;
+  width: 100%;
+  height: 100%;
 }
 pre#results {
   position: absolute;
@@ -93,11 +100,13 @@ span#statusError {
   background-color: rgba(255, 0, 0, 0.63);
 }
 </style>
-<script src="ace.js" defer="true"></script>
+<script src="bundle.js" defer="true"></script>
 </head>
 <body>
 <script type="module" src="index.js"></script>
-<div id="sql"></div>
+<div id="sql">
+<div id="editor"></div>
+</div>
 <div id="status">
 <span id="statusError"></span>
 <span id="statusTime"></span>

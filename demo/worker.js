@@ -437,8 +437,10 @@ function createEnvironment (dbName, memory, heap, malloc) {
       regions: [],
       wal: {
         bytes,
-        file: (new Wal()).open(`${name}-wal`, bytes)
+        file: (new Wal()).open(`${name}-wal`, bytes),
+        opened: false
       },
+      inMemory: false,
       openFiles: {},
       stats: { recv: 0 },
       cache: new Map()
@@ -522,7 +524,7 @@ function createEnvironment (dbName, memory, heap, malloc) {
     wasm_http_file_stat: (i0, o0, o1) => {
       const path = ReadCString(heap, i0)
       const name = getName(path)
-      console.log(`${name}.wasm_http_file_stat ${path}`)
+      //console.log(`${name}.wasm_http_file_stat ${path}`)
       const access = new Pointer(memory, o0)
       const size = new Pointer(memory, o1)
       if (path.indexOf('-journal') > -1) {
@@ -531,7 +533,7 @@ function createEnvironment (dbName, memory, heap, malloc) {
         return constants.SQLITE_OK
       }
       const env = createDatabase(name)
-      if (path.indexOf('-wal') > -1 && env.wal.opened) {
+      if (path.indexOf('-wal') > -1 && (env.wal.opened || env.inMemory)) {
         access.set(vfsFlags.HTTP_FILE_READWRITE)
         size.set(env.wal.file.offset)
         return
@@ -549,6 +551,7 @@ function createEnvironment (dbName, memory, heap, malloc) {
           }
           return constants.SQLITE_OK
         }
+        env.inMemory = true
         access.set(vfsFlags.HTTP_FILE_READWRITE)
         size.set(0)
         return constants.SQLITE_OK
@@ -560,11 +563,11 @@ function createEnvironment (dbName, memory, heap, malloc) {
     wasm_http_get_bytes: (i0, i1, start, end) => {
       const path = ReadCString(heap, i0)
       const name = getName(path)
-      console.log(`${name}.wasm_http_get_bytes ${path}`)
+      //console.log(`${name}.wasm_http_get_bytes ${path}`)
       const range = `bytes=${start}-${end - 1n}`
       const env = createDatabase(name)
       if (env.openFiles[path].wal) {
-        if (env.wal.index.mxFrame === 0) {
+        if (!env.wal.index || env.wal.index.mxFrame === 0) {
           xhr.open('GET', path, false)
           xhr.responseType = 'arraybuffer'
           xhr.setRequestHeader('Range', range)
@@ -605,13 +608,19 @@ function createEnvironment (dbName, memory, heap, malloc) {
         }
         return constants.SQLITE_OK
       }
+      if (env.inMemory) {
+        if (start === 0n && !env.cache.has(`${name}.${range}`)) {
+          env.cache.set(`${name}.bytes=${start}-${4095}`, heap.slice(i1, i1 + 4095))
+        }
+        return constants.SQLITE_OK
+      }
       xhr.open('GET', path, false)
       xhr.responseType = 'arraybuffer'
       xhr.setRequestHeader('Range', range)
       xhr.send()
       if(xhr.status !== 206) {
         if (start === 0n && !env.cache.has(`${name}.${range}`)) {
-          env.cache.set(`${name}.bytes=${start}-${4095}`, heap.subarray(i1, i1 + 4095))
+          env.cache.set(`${name}.bytes=${start}-${4095}`, heap.slice(i1, i1 + 4095))
         }
         return constants.SQLITE_OK
       }
@@ -624,7 +633,7 @@ function createEnvironment (dbName, memory, heap, malloc) {
     wasm_http_set_bytes: (i0, i1, amount, offset) => {
       const path = ReadCString(heap, i0)
       const name = getName(path)
-      console.log(`${name}.wasm_http_set_bytes ${path}`)
+      //console.log(`${name}.wasm_http_set_bytes ${path}`)
       const env = createDatabase(name)
       if (env.openFiles[path].wal) {
         const bytes = heap.slice(i1, i1 + amount)
@@ -769,13 +778,17 @@ function open (dbName) {
         const database = db.databases[name]
         const { pageSize, checkpointSequence } = database.wal.file
         const { stats } = database
-        const { counter, mxFrame, nPage, backfill, backfillAttempt } = database.wal.index
-        const delta = database.wal.file.serialize(database.wal.file.consolidate(database.wal.file.readFrames(mxFrame)))
-        results.push({
-          pageSize, checkpointSequence,
-          counter, mxFrame, nPage, backfill, backfillAttempt,
-          stats, delta, name
-        })
+        if (database.wal.index) {
+          const { counter, mxFrame, nPage, backfill, backfillAttempt } = database.wal.index
+          const delta = database.wal.file.serialize(database.wal.file.consolidate(database.wal.file.readFrames(mxFrame)))
+          results.push({
+            pageSize, checkpointSequence,
+            counter, mxFrame, nPage, backfill, backfillAttempt,
+            stats, delta, name
+          })
+        } else {
+          results.push({ pageSize, checkpointSequence, stats, name })
+        }
       }
       return results
     }
