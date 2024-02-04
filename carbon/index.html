@@ -3,12 +3,22 @@
 <script src="https://code.highcharts.com/modules/accessibility.js"></script>
 <style>
 body {
+  background-color: #c0c0c0;
+}
+div.chart {
   background-color: #f0f0f0;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 div.centered {
   height: 700px;
   width: 80%;
   margin: 1em auto;
+}
+div.footer {
+  width: 80%;
+  margin: 1em auto;
+  text-align: center;
 }
 h1,h2 {
   text-align: center;
@@ -16,7 +26,7 @@ h1,h2 {
 p.subtitle {
   text-align: center;
 }
-h1,h2,a {
+h1,h2,a,p {
   font-family: monospace;
 }
 h2 {
@@ -31,6 +41,7 @@ Highcharts.setOptions({
 
 </script>
 
+<div class="chart">
 <h1>Fossil Co2 emissions by Region</h1>
 <h2>All values in million tonnes of Co2 per year</h2>
 <p class="subtitle">
@@ -54,7 +65,7 @@ Highcharts.chart('territorial', {
     }
   },
   "title": {
-    "text": "Million Tonnes of Carbon (MtC)"
+    "text": "Million Tonnes of Co2 (MtCO2)"
   },
   "xAxis": {
     "categories": [
@@ -236,7 +247,7 @@ Highcharts.chart('territorial', {
   },
   "yAxis": {
     "title": {
-      "text": "MtC"
+      "text": "MtCO2"
     },
     "tickInterval": 100
   },
@@ -1668,7 +1679,9 @@ Highcharts.chart('territorial', {
   ]
 });
 </script>
+</div>
 
+<div class="chart">
 <h1>Fossil Co2 emissions Share By Region</h1>
 <h2>All values in percentage share of total emissions</h2>
 <p class="subtitle">
@@ -1692,7 +1705,7 @@ Highcharts.chart('territorial_percent', {
     }
   },
   "title": {
-    "text": "Million Tonnes of Carbon (MtC)"
+    "text": "share of emissions"
   },
   "xAxis": {
     "categories": [
@@ -1874,7 +1887,7 @@ Highcharts.chart('territorial_percent', {
   },
   "yAxis": {
     "title": {
-      "text": "MtC"
+      "text": "percent"
     },
     "tickInterval": 100
   },
@@ -3306,4 +3319,11 @@ Highcharts.chart('territorial_percent', {
   ]
 });
 </script>
+</div>
+
+<div class="footer">
+<p>
+Source Data used for these charts and reports by FriedlingStein et. al can be found <a target="_blank" href="https://globalcarbonbudget.org/fossil-co2-emissions-at-record-high-in-2023/">here</a>
+</p>
+</div>
 
